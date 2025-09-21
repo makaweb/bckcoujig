@@ -49,7 +49,10 @@ connectDB();
 // Routes
 import authRoutes from './routes/auth.js';
 import boatRoutes from './routes/boats.js';
+import vesselRoutes from './routes/vessels.js';
 
+
+app.use('/api/vessels', vesselRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/boats', boatRoutes);
 
