@@ -1,6 +1,7 @@
-const express = require('express');
-const router = express.Router();
-const Vessel = require('../models/Vessel');
+import express, { Router } from 'express';
+import Vessel from '../models/Vessel.js';
+
+const router = Router();
 
 // دریافت شناورهای نزدیک
 // query: lat, lon, radiusKm
@@ -64,4 +65,4 @@ router.post('/update', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
