@@ -519,7 +519,56 @@ router.get('/db-status', async (req, res) => {
     });
   }
 });
+// بروزرسانی رمز عبور
+router.post('/update-password', async (req, res) => {
+  try {
+    const { mobile, nationalCode, passwordHash } = req.body;
 
+    // Validation
+    if (!mobile || !nationalCode || !passwordHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'اطلاعات ناقص است'
+      });
+    }
+
+    // پیدا کردن کاربر
+    const user = await User.findOne({ mobile, nationalCode });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'کاربر یافت نشد'
+      });
+    }
+
+    console.log('🔑 [Server] Updating password for user:', {
+      id: user._id,
+      mobile: user.mobile,
+      nationalCode: user.nationalCode,
+      oldPasswordHashLength: user.passwordHash?.length || 0,
+      newPasswordHashLength: passwordHash.length
+    });
+
+    // بروزرسانی رمز عبور
+    user.passwordHash = passwordHash;
+    user.updatedAt = new Date();
+    await user.save();
+
+    console.log('✅ [Server] Password updated successfully');
+
+    res.json({
+      success: true,
+      message: 'رمز عبور با موفقیت بروزرسانی شد'
+    });
+
+  } catch (error) {
+    console.error('❌ [Server] Error updating password:', error);
+    res.status(500).json({
+      success: false,
+      error: 'خطای داخلی سرور'
+    });
+  }
+});
 // 🔧 Development helper: list active verifications (only in development)
 router.get('/debug/verifications', async (req, res) => {
   if (process.env.ALLOW_DEV_DEBUG !== 'true') {
