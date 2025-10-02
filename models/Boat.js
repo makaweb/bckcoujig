@@ -1,100 +1,35 @@
 import mongoose from "mongoose";
-import moment from "moment-jalaali";
 
 const boatSchema = new mongoose.Schema({
   boat_name: { type: String, required: true },
-  boat_code: { type: String, required: true }, // حذف unique از اینجا
-  boat_type_id: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "BoatType", 
-    required: true 
-  },
-  fishing_method_id: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "FishingMethod", 
-    required: true 
-  },
-  length: { type: Number, default: null }, // متر
-  width: { type: Number, default: null }, // متر
-  engine_power: { type: Number, default: null }, // اسب بخار
-  fuel_capacity: { type: Number, default: null }, // لیتر
-  crew_capacity: { type: Number, default: null },
-  
-  // مشخصات مالکیت
-  owner_id: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User", 
-    required: true 
-  },
-  captain_id: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User", 
-    default: null 
-  },
-  
-  // مستندات و تصاویر
+  boat_code: { type: String, required: true },
+  registration_date: { type: String, default: null },
   documents: { type: String, default: null },
-  boat_image: { type: String, default: null },
-  license_number: { type: String, default: null },
-  insurance_info: {
-    company: String,
-    policy_number: String,
-    expiry_date: String,
-    coverage_amount: Number
+  fuel_quota: { type: String, default: null },
+  boat_type_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "BoatType"
   },
-  
-  // تاریخ‌ها
-  registration_date: { 
-    type: String, 
-    default: moment().format("jYYYY-jMM-jDD") 
+  fishing_method_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "FishingMethod"
   },
-  last_inspection_date: { type: String, default: null },
-  next_inspection_due: { type: String, default: null },
-  
-  // وضعیت
-  status: { 
-    type: String, 
-    enum: ["pending", "active", "inactive", "maintenance", "retired"],
-    default: "pending" 
+  status: { type: Number, default: 0 }, // 0: pending, 1: active, 2: inactive, etc.
+  owner_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
   },
-  
-  // ابزارهای نصب شده
-  installed_tools: [{
-    tool_id: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: "FishingTool" 
-    },
-    installation_date: String,
-    condition: {
-      type: String,
-      enum: ["excellent", "good", "fair", "poor"],
-      default: "good"
-    },
-    last_maintenance: String,
-    notes: String
-  }],
-  
-  // هزینه‌ها و اقتصادی
-  operating_costs: {
-    daily_fuel_cost: Number,
-    maintenance_budget: Number,
-    crew_wages: Number,
-    other_expenses: Number
+  captain_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null
   },
-  
-  // یادداشت‌ها
-  notes: { type: String, default: null },
-  
-  // متادیتا
-  created_by: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User", 
-    required: true 
-  },
-  last_updated_by: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User" 
-  }
+  installed_tools: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
+  invoice_period: { type: String, default: null },
+  settlement_period: { type: String, default: null },
+  min_crew: { type: Number, default: null },
+  max_crew: { type: Number, default: null },
+  synced: { type: Number, default: 0 }
 }, { timestamps: true });
 
 // ایندکس‌های مهم برای performance و business logic
@@ -105,7 +40,7 @@ boatSchema.index({ fishing_method_id: 1 });
 boatSchema.index({ status: 1 });
 boatSchema.index({ captain_id: 1 });
 
-// Middleware برای validation
+// Middleware for validation
 boatSchema.pre('save', function(next) {
   // اطمینان از اینکه یک شناور برای هر روش صید فقط یکبار ثبت شود
   if (this.isNew || this.isModified('boat_code') || this.isModified('fishing_method_id')) {
