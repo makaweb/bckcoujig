@@ -17,7 +17,6 @@ router.get('/boats/:ownerId', async (req, res) => {
       .populate('boat_type_id')
       .populate('fishing_method_id')
       .populate('captain_id', 'name phone')
-      .populate('installed_tools.tool_id')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -335,6 +334,94 @@ router.post('/boats/add-fishing-method', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+// 3.7. همگام‌سازی شناورها (Sync)
+router.post('/boats/sync', async (req, res) => {
+  try {
+    const { created, updated } = req.body;
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    };
+
+    // 1. پردازش شناورهای جدید (Created)
+    if (created && Array.isArray(created)) {
+      for (const boatData of created) {
+        const { id: localId, ...newBoatData } = boatData;
+        try {
+          // چون ممکن است شناور در سرور وجود داشته باشد (مثلا توسط کاربر دیگری ثبت شده)
+          // ابتدا بر اساس کلیدهای اصلی (boat_code, fishing_method_id) چک می‌کنیم
+          let boat = await Boat.findOne({
+            boat_code: newBoatData.boat_code,
+            fishing_method_id: newBoatData.fishing_method_id,
+          });
+
+          if (boat) {
+            // اگر وجود داشت، آن را آپدیت می‌کنیم (last write wins)
+            Object.assign(boat, newBoatData, { synced: 1 });
+            await boat.save();
+            results.updated.push({ localId, serverId: boat._id, status: 'merged' });
+          } else {
+            // اگر وجود نداشت، شناور جدید را می‌سازیم
+            boat = new Boat({ ...newBoatData, synced: 1 });
+            await boat.save();
+            results.created.push({ localId, serverId: boat._id });
+          }
+        } catch (error) {
+          results.errors.push({ localId, error: error.message });
+        }
+      }
+    }
+
+    // 2. پردازش شناورهای آپدیت شده (Updated)
+    if (updated && Array.isArray(updated)) {
+      for (const boatData of updated) {
+        const { id: serverId, ...updateData } = boatData;
+        try {
+          // فقط فیلدهایی که از کلاینت آمده را آپدیت کن
+          const updatedBoat = await Boat.findByIdAndUpdate(
+            serverId,
+            { $set: { ...updateData, synced: 1 } },
+            { new: true, runValidators: true }
+          );
+
+          if (updatedBoat) {
+            results.updated.push({ serverId, status: 'updated' });
+          } else {
+            results.errors.push({ id: serverId, error: 'شناور برای آپدیت یافت نشد' });
+          }
+        } catch (error) {
+          results.errors.push({ id: serverId, error: error.message });
+        }
+      }
+    }
+    
+    // 3. ارسال داده‌های جدید سرور به کلاینت
+    // کلاینت می‌تواند آخرین زمان همگام‌سازی را بفرستد
+    const { last_sync_timestamp } = req.query;
+    let serverUpdates = [];
+    if (last_sync_timestamp) {
+        serverUpdates = await Boat.find({ updatedAt: { $gt: new Date(last_sync_timestamp) } })
+                                  .populate('boat_type_id')
+                                  .populate('fishing_method_id');
+    }
+
+
+    res.json({
+      success: true,
+      message: 'همگام‌سازی با موفقیت انجام شد',
+      results,
+      server_updates: serverUpdates
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: `خطا در پردازش همگام‌سازی: ${error.message}`
     });
   }
 });
