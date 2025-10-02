@@ -353,6 +353,10 @@ router.post('/boats/sync', async (req, res) => {
       for (const boatData of created) {
         const { id: localId, ...newBoatData } = boatData;
         try {
+          console.log(`📝 پردازش شناور جدید: ${newBoatData.boat_name} (Local ID: ${localId})`);
+          console.log(`   - boat_type_id: ${newBoatData.boat_type_id}`);
+          console.log(`   - fishing_method_id: ${newBoatData.fishing_method_id}`);
+
           // چون ممکن است شناور در سرور وجود داشته باشد (مثلا توسط کاربر دیگری ثبت شده)
           // ابتدا بر اساس کلیدهای اصلی (boat_code, fishing_method_id) چک می‌کنیم
           let boat = await Boat.findOne({
@@ -362,16 +366,20 @@ router.post('/boats/sync', async (req, res) => {
 
           if (boat) {
             // اگر وجود داشت، آن را آپدیت می‌کنیم (last write wins)
+            console.log(`🔄 شناور موجود است، بروزرسانی می‌شود...`);
             Object.assign(boat, newBoatData, { synced: 1 });
             await boat.save();
-            results.updated.push({ localId, serverId: boat._id, status: 'merged' });
+            results.updated.push({ localId, serverId: boat._id.toString(), status: 'merged' });
           } else {
             // اگر وجود نداشت، شناور جدید را می‌سازیم
+            console.log(`➕ ایجاد شناور جدید...`);
             boat = new Boat({ ...newBoatData, synced: 1 });
             await boat.save();
-            results.created.push({ localId, serverId: boat._id });
+            results.created.push({ localId, serverId: boat._id.toString() });
+            console.log(`✅ شناور با موفقیت ایجاد شد. Server ID: ${boat._id}`);
           }
         } catch (error) {
+          console.error(`❌ خطا در پردازش شناور (Local ID: ${localId}): ${error.message}`);
           results.errors.push({ localId, error: error.message });
         }
       }
@@ -380,22 +388,40 @@ router.post('/boats/sync', async (req, res) => {
     // 2. پردازش شناورهای آپدیت شده (Updated)
     if (updated && Array.isArray(updated)) {
       for (const boatData of updated) {
-        const { id: serverId, ...updateData } = boatData;
+        const { id: localId, ...updateData } = boatData;
         try {
-          // فقط فیلدهایی که از کلاینت آمده را آپدیت کن
-          const updatedBoat = await Boat.findByIdAndUpdate(
-            serverId,
-            { $set: { ...updateData, synced: 1 } },
-            { new: true, runValidators: true }
-          );
+          console.log(`🔄 بروزرسانی شناور: ${updateData.boat_name} (Local ID: ${localId})`);
 
-          if (updatedBoat) {
-            results.updated.push({ serverId, status: 'updated' });
+          // اگر server_id وجود نداشت، از boat_code و fishing_method_id استفاده می‌کنیم
+          let boat;
+          if (updateData.server_id) {
+            boat = await Boat.findByIdAndUpdate(
+              updateData.server_id,
+              { $set: { ...updateData, synced: 1 } },
+              { new: true, runValidators: true }
+            );
           } else {
-            results.errors.push({ id: serverId, error: 'شناور برای آپدیت یافت نشد' });
+            // جستجو بر اساس boat_code و fishing_method_id
+            boat = await Boat.findOneAndUpdate(
+              {
+                boat_code: updateData.boat_code,
+                fishing_method_id: updateData.fishing_method_id
+              },
+              { $set: { ...updateData, synced: 1 } },
+              { new: true, runValidators: true }
+            );
+          }
+
+          if (boat) {
+            results.updated.push({ localId, serverId: boat._id.toString(), status: 'updated' });
+            console.log(`✅ شناور با موفقیت بروزرسانی شد`);
+          } else {
+            console.log(`⚠️ شناور برای آپدیت یافت نشد`);
+            results.errors.push({ localId, error: 'شناور برای آپدیت یافت نشد' });
           }
         } catch (error) {
-          results.errors.push({ id: serverId, error: error.message });
+          console.error(`❌ خطا در بروزرسانی شناور (Local ID: ${localId}): ${error.message}`);
+          results.errors.push({ localId, error: error.message });
         }
       }
     }
@@ -516,6 +542,81 @@ router.get('/fishing-methods', async (req, res) => {
   }
 });
 
+// 1.5. همگام‌سازی روش‌های صید
+router.post('/fishing-methods/sync', async (req, res) => {
+  try {
+    const { created, updated } = req.body;
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    };
+
+    // پردازش روش‌های صید جدید
+    if (created && Array.isArray(created)) {
+      for (const methodData of created) {
+        const { id: localId, ...newMethodData } = methodData;
+        try {
+          // بررسی وجود روش صید با همین نام
+          let method = await FishingMethod.findOne({ name: newMethodData.name });
+
+          if (method) {
+            // اگر وجود داشت، آن را آپدیت می‌کنیم
+            Object.assign(method, newMethodData);
+            await method.save();
+            results.updated.push({ localId, serverId: method._id, status: 'merged' });
+          } else {
+            // اگر وجود نداشت، روش صید جدید را می‌سازیم
+            method = new FishingMethod(newMethodData);
+            await method.save();
+            results.created.push({ localId, serverId: method._id });
+          }
+        } catch (error) {
+          results.errors.push({ localId, error: error.message });
+        }
+      }
+    }
+
+    // پردازش روش‌های صید آپدیت شده
+    if (updated && Array.isArray(updated)) {
+      for (const methodData of updated) {
+        const { id: serverId, ...updateData } = methodData;
+        try {
+          const updatedMethod = await FishingMethod.findByIdAndUpdate(
+            serverId,
+            { $set: updateData },
+            { new: true, runValidators: true }
+          );
+
+          if (updatedMethod) {
+            results.updated.push({ serverId, status: 'updated' });
+          } else {
+            results.errors.push({ id: serverId, error: 'روش صید برای آپدیت یافت نشد' });
+          }
+        } catch (error) {
+          results.errors.push({ id: serverId, error: error.message });
+        }
+      }
+    }
+
+    // ارسال تمام روش‌های صید فعال به کلاینت
+    const allMethods = await FishingMethod.find({ is_active: true }).sort({ name: 1 });
+
+    res.json({
+      success: true,
+      message: 'همگام‌سازی روش‌های صید با موفقیت انجام شد',
+      results,
+      server_data: allMethods
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: `خطا در همگام‌سازی روش‌های صید: ${error.message}`
+    });
+  }
+});
+
 // 2. ثبت روش صید سفارشی
 router.post('/fishing-methods/custom', async (req, res) => {
   try {
@@ -570,7 +671,7 @@ router.post('/fishing-methods/custom', async (req, res) => {
 router.get('/fishing-tools', async (req, res) => {
   try {
     const { method_id } = req.query;
-    
+
     let query = { is_active: true };
     if (method_id) {
       query.compatible_methods = method_id;
@@ -588,6 +689,83 @@ router.get('/fishing-tools', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+// 1.5. همگام‌سازی ابزارهای صید
+router.post('/fishing-tools/sync', async (req, res) => {
+  try {
+    const { created, updated } = req.body;
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    };
+
+    // پردازش ابزارهای صید جدید
+    if (created && Array.isArray(created)) {
+      for (const toolData of created) {
+        const { id: localId, ...newToolData } = toolData;
+        try {
+          // بررسی وجود ابزار با همین نام
+          let tool = await FishingTool.findOne({ name: newToolData.name });
+
+          if (tool) {
+            // اگر وجود داشت، آن را آپدیت می‌کنیم
+            Object.assign(tool, newToolData);
+            await tool.save();
+            results.updated.push({ localId, serverId: tool._id, status: 'merged' });
+          } else {
+            // اگر وجود نداشت، ابزار جدید را می‌سازیم
+            tool = new FishingTool(newToolData);
+            await tool.save();
+            results.created.push({ localId, serverId: tool._id });
+          }
+        } catch (error) {
+          results.errors.push({ localId, error: error.message });
+        }
+      }
+    }
+
+    // پردازش ابزارهای صید آپدیت شده
+    if (updated && Array.isArray(updated)) {
+      for (const toolData of updated) {
+        const { id: serverId, ...updateData } = toolData;
+        try {
+          const updatedTool = await FishingTool.findByIdAndUpdate(
+            serverId,
+            { $set: updateData },
+            { new: true, runValidators: true }
+          );
+
+          if (updatedTool) {
+            results.updated.push({ serverId, status: 'updated' });
+          } else {
+            results.errors.push({ id: serverId, error: 'ابزار صید برای آپدیت یافت نشد' });
+          }
+        } catch (error) {
+          results.errors.push({ id: serverId, error: error.message });
+        }
+      }
+    }
+
+    // ارسال تمام ابزارهای صید فعال به کلاینت
+    const allTools = await FishingTool.find({ is_active: true })
+      .populate('compatible_methods', 'name')
+      .sort({ category: 1, name: 1 });
+
+    res.json({
+      success: true,
+      message: 'همگام‌سازی ابزارهای صید با موفقیت انجام شد',
+      results,
+      server_data: allTools
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: `خطا در همگام‌سازی ابزارهای صید: ${error.message}`
     });
   }
 });
@@ -634,6 +812,83 @@ router.get('/boat-types', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+// 1.5. همگام‌سازی انواع شناور
+router.post('/boat-types/sync', async (req, res) => {
+  try {
+    const { created, updated } = req.body;
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    };
+
+    // پردازش انواع شناور جدید
+    if (created && Array.isArray(created)) {
+      for (const typeData of created) {
+        const { id: localId, ...newTypeData } = typeData;
+        try {
+          // بررسی وجود نوع شناور با همین نام
+          let boatType = await BoatType.findOne({ name: newTypeData.name });
+
+          if (boatType) {
+            // اگر وجود داشت، آن را آپدیت می‌کنیم
+            Object.assign(boatType, newTypeData);
+            await boatType.save();
+            results.updated.push({ localId, serverId: boatType._id, status: 'merged' });
+          } else {
+            // اگر وجود نداشت، نوع شناور جدید را می‌سازیم
+            boatType = new BoatType(newTypeData);
+            await boatType.save();
+            results.created.push({ localId, serverId: boatType._id });
+          }
+        } catch (error) {
+          results.errors.push({ localId, error: error.message });
+        }
+      }
+    }
+
+    // پردازش انواع شناور آپدیت شده
+    if (updated && Array.isArray(updated)) {
+      for (const typeData of updated) {
+        const { id: serverId, ...updateData } = typeData;
+        try {
+          const updatedType = await BoatType.findByIdAndUpdate(
+            serverId,
+            { $set: updateData },
+            { new: true, runValidators: true }
+          );
+
+          if (updatedType) {
+            results.updated.push({ serverId, status: 'updated' });
+          } else {
+            results.errors.push({ id: serverId, error: 'نوع شناور برای آپدیت یافت نشد' });
+          }
+        } catch (error) {
+          results.errors.push({ id: serverId, error: error.message });
+        }
+      }
+    }
+
+    // ارسال تمام انواع شناور فعال به کلاینت
+    const allTypes = await BoatType.find({ is_active: true })
+      .populate('suitable_methods', 'name')
+      .sort({ name: 1 });
+
+    res.json({
+      success: true,
+      message: 'همگام‌سازی انواع شناور با موفقیت انجام شد',
+      results,
+      server_data: allTypes
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: `خطا در همگام‌سازی انواع شناور: ${error.message}`
     });
   }
 });
