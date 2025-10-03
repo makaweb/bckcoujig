@@ -339,7 +339,7 @@ router.post('/boats/add-fishing-method', async (req, res) => {
 });
 
 // 3.7. همگام‌سازی شناورها (Sync)
-router.post('/boats/sync', async (req, res) => {
+router.post('/sync', async (req, res) => {
   try {
     const { created, updated } = req.body;
     const results = {
