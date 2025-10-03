@@ -46,16 +46,21 @@ const connectDB = async () => {
 
 connectDB();
 
+// Basic request logger for debugging (باید قبل از routes باشد)
+app.use((req, res, next) => {
+  console.log(`➡️ ${req.method} ${req.originalUrl} from ${req.ip}`);
+  next();
+});
+
 // Routes
 import authRoutes from './routes/auth.js';
 import boatRoutes from './routes/boats.js';
 import vesselRoutes from './routes/vessels.js';
 
-
 app.use('/api/vessels', vesselRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/boats', boatRoutes);
-
+app.use('/api/boats/fishing-methods/sync',boatRoutes.syncFishingMethods);
 // Simple ping endpoint for emulator connectivity checks
 app.get('/ping', (req, res) => {
   res.json({
@@ -63,12 +68,6 @@ app.get('/ping', (req, res) => {
     message: 'pong',
     timestamp: new Date().toISOString(),
   });
-});
-
-// Basic request logger for debugging
-app.use((req, res, next) => {
-  console.log(`➡️ ${req.method} ${req.originalUrl} from ${req.ip}`);
-  next();
 });
 
 // Test endpoint
@@ -106,9 +105,6 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 سرور در حال اجرا روی پورت ${PORT}`);
-  console.log(`🔗 Local URL: http://localhost:${PORT}`);
-  console.log(`📱 Flutter Emulator: http://10.0.2.2:${PORT}`);
-  console.log(`� Flutter Real Device: http://YOUR_IP:${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
