@@ -105,6 +105,9 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 سرور در حال اجرا روی پورت ${PORT}`);
+  console.log(`🔗 Local URL: http://localhost:${PORT}`);
+  console.log(`📱 Flutter Emulator: http://10.0.2.2:${PORT}`);
+  console.log(`� Flutter Real Device: http://YOUR_IP:${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
