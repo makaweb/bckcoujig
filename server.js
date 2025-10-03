@@ -60,7 +60,7 @@ import vesselRoutes from './routes/vessels.js';
 app.use('/api/vessels', vesselRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/boats', boatRoutes);
-app.use('/api/boats/fishing-methods/sync',boatRoutes.syncFishingMethods);
+
 // Simple ping endpoint for emulator connectivity checks
 app.get('/ping', (req, res) => {
   res.json({
