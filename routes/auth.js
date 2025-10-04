@@ -519,6 +519,7 @@ router.get('/db-status', async (req, res) => {
     });
   }
 });
+
 // بروزرسانی رمز عبور
 router.post('/update-password', async (req, res) => {
   try {
@@ -569,6 +570,7 @@ router.post('/update-password', async (req, res) => {
     });
   }
 });
+
 // 🔧 Development helper: list active verifications (only in development)
 router.get('/debug/verifications', async (req, res) => {
   if (process.env.ALLOW_DEV_DEBUG !== 'true') {
@@ -588,6 +590,225 @@ router.get('/debug/verifications', async (req, res) => {
   } catch (error) {
     console.error('خطا در debug/verifications:', error);
     res.status(500).json({ success: false, error: 'خطای داخلی سرور' });
+  }
+});
+
+// 🔐 ورود با OTP (بدون رمز عبور)
+router.post('/login-with-otp', async (req, res) => {
+  try {
+    const { mobile, code } = req.body;
+
+    // Validation
+    if (!mobile || !code) {
+      return res.status(400).json({
+        success: false,
+        error: 'شماره موبایل و کد تأیید الزامی است'
+      });
+    }
+
+    console.log('🔐 login-with-otp request:', { mobile, code });
+
+    // بررسی وجود کاربر
+    const user = await User.findOne({ mobile });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'کاربری با این شماره موبایل یافت نشد'
+      });
+    }
+
+    // بررسی تایید شدن کاربر
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        error: 'حساب کاربری شما هنوز تایید نشده است. لطفاً با پشتیبانی تماس بگیرید.',
+        isVerified: false,
+        user: {
+          mobile: user.mobile,
+          name: user.name,
+          nationalCode: user.nationalCode
+        }
+      });
+    }
+
+    // تایید کد OTP
+    const verification = await Verification.findOne({
+      mobile,
+      isUsed: false,
+      expiresAt: { $gt: new Date() },
+      type: 'login' // فقط کدهای login
+    });
+
+    console.log('🔎 OTP verification lookup:', verification ? {
+      id: verification._id,
+      code: verification.code,
+      isUsed: verification.isUsed,
+      attempts: verification.attempts,
+      expiresAt: verification.expiresAt
+    } : null);
+
+    if (!verification) {
+      return res.status(400).json({
+        success: false,
+        error: 'کد تأیید یافت نشد یا منقضی شده است'
+      });
+    }
+
+    // بررسی تعداد تلاش‌ها
+    if (verification.attempts >= 3) {
+      await Verification.deleteOne({ _id: verification._id });
+      return res.status(400).json({
+        success: false,
+        error: 'تعداد تلاش‌های مجاز تمام شده است'
+      });
+    }
+
+    // بررسی کد
+    if (verification.code !== code.toString()) {
+      verification.attempts += 1;
+      await verification.save();
+      return res.status(400).json({
+        success: false,
+        error: 'کد تأیید اشتباه است',
+        remainingAttempts: 3 - verification.attempts
+      });
+    }
+
+    // کد درست است - ورود موفق
+    verification.isUsed = true;
+    await verification.save();
+
+    // به‌روزرسانی آخرین ورود
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    console.log('✅ OTP login successful for user:', user.mobile);
+
+    res.json({
+      success: true,
+      message: 'ورود با موفقیت انجام شد',
+      user: {
+        id: user._id,
+        mobile: user.mobile,
+        nationalCode: user.nationalCode,
+        name: user.name,
+        role: user.role,
+        isVerified: user.isVerified,
+        avatar: user.avatar,
+        createdBy: user.createdBy
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ خطا در ورود با OTP:', error);
+    res.status(500).json({
+      success: false,
+      error: 'خطای داخلی سرور'
+    });
+  }
+});
+
+// 📱 ارسال کد OTP برای ورود
+router.post('/send-login-otp', async (req, res) => {
+  try {
+    const { mobile } = req.body;
+    const m = String(mobile || '').trim();
+
+    // Validation
+    if (!m || !/^09\d{9}$/.test(m)) {
+      return res.status(400).json({
+        success: false,
+        error: 'شماره موبایل معتبر نیست'
+      });
+    }
+
+    // بررسی وجود کاربر
+    const user = await User.findOne({ mobile: m });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'کاربری با این شماره موبایل یافت نشد'
+      });
+    }
+
+    // بررسی تایید شدن کاربر
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        error: 'حساب کاربری شما هنوز تایید نشده است. لطفاً با پشتیبانی تماس بگیرید.',
+        isVerified: false,
+        user: {
+          mobile: user.mobile,
+          name: user.name,
+          nationalCode: user.nationalCode
+        }
+      });
+    }
+
+    // تولید کد 6 رقمی
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const ttlSec = parseInt(process.env.VERIFICATION_TTL_SEC || '120');
+    const expiresAt = new Date(Date.now() + ttlSec * 1000);
+
+    // ذخیره کد در دیتابیس
+    const savedDoc = await Verification.findOneAndUpdate(
+      { mobile: m, type: 'login' },
+      {
+        mobile: m,
+        code,
+        type: 'login',
+        expiresAt: expiresAt,
+        attempts: 0,
+        isUsed: false
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
+    );
+
+    console.log('🔐 Login OTP saved:', {
+      mobile: m,
+      code: code,
+      expiresAt: expiresAt
+    });
+
+    // ارسال پیامک
+    const smsResult = await smsService.sendVerificationCode(m, code);
+    console.log(`📤 کد ورود برای ${m}: ${code}`);
+    console.log('📱 نتیجه ارسال پیامک:', smsResult);
+
+    // پاسخ به اپلیکیشن
+    const response = {
+      success: true,
+      message: 'کد تأیید برای ورود ارسال شد',
+      mobile: m,
+      user: {
+        name: user.name,
+        isVerified: user.isVerified
+      }
+    };
+
+    // فقط در development کد را برگردان
+    if (process.env.ALLOW_DEV_CODE === 'true') {
+      response.code = code;
+      response.dev_mode = true;
+      response.expiresAt = expiresAt;
+      response.ttlSec = ttlSec;
+    }
+
+    // اگر پیامک ارسال نشد، کد را برگردان
+    if (!smsResult.success && smsResult.fallback_code) {
+      response.code = smsResult.fallback_code;
+      response.fallback = true;
+      response.sms_error = smsResult.error;
+    }
+
+    res.json(response);
+
+  } catch (error) {
+    console.error('❌ خطا در ارسال کد ورود:', error);
+    res.status(500).json({
+      success: false,
+      error: 'خطای داخلی سرور'
+    });
   }
 });
 
