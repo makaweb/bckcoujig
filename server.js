@@ -56,10 +56,12 @@ app.use((req, res, next) => {
 import authRoutes from './routes/auth.js';
 import boatRoutes from './routes/boats.js';
 import vesselRoutes from './routes/vessels.js';
+import crewRoutes from './routes/crew.js';
 
 app.use('/api/vessels', vesselRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/boats', boatRoutes);
+app.use('/api/crew', crewRoutes);
 
 // Simple ping endpoint for emulator connectivity checks
 app.get('/ping', (req, res) => {
