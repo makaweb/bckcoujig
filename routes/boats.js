@@ -893,6 +893,66 @@ router.post('/boat-types/sync', async (req, res) => {
   }
 });
 
+// 📥 **وارد کردن و خروجی گرفتن شناورها**
+
+// دریافت شناورهای کاربر برای وارد کردن (بر اساس کد ملی)
+router.post('/boats/get-user-boats', async (req, res) => {
+  try {
+    const { nationalCode } = req.body;
+
+    if (!nationalCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'کد ملی الزامی است'
+      });
+    }
+
+    console.log(`🔍 [BoatImport] درخواست شناورهای کاربر با کد ملی: ${nationalCode}`);
+
+    // جستجوی شناورهای کاربر
+    const boats = await Boat.find({ owner_id: nationalCode })
+      .populate('boat_type_id', 'name')
+      .populate('fishing_method_id', 'name name_fa')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    console.log(`✅ [BoatImport] ${boats.length} شناور یافت شد`);
+
+    // تبدیل به فرمت مناسب برای انتقال
+    const formattedBoats = boats.map(boat => ({
+      id: boat._id.toString(),
+      name: boat.boat_name,
+      code: boat.boat_code,
+      type: boat.boat_type_id?.name || 'نامشخص',
+      fishingMethod: boat.fishing_method_id?.name_fa || boat.fishing_method_id?.name || 'نامشخص',
+      status: boat.status || 0,
+      registrationDate: boat.registration_date || boat.createdAt,
+      tools: boat.installed_tools || '',
+      fuelQuota: boat.fuel_quota || 0,
+      length: boat.length,
+      width: boat.width,
+      enginePower: boat.engine_power,
+      hullMaterial: boat.hull_material,
+      manufacturerYear: boat.manufacturer_year,
+    }));
+
+    res.json({
+      success: true,
+      boats: formattedBoats,
+      total: formattedBoats.length,
+      message: `${formattedBoats.length} شناور یافت شد`
+    });
+
+  } catch (error) {
+    console.error('❌ [BoatImport] خطا در دریافت شناورها:', error);
+    res.status(500).json({
+      success: false,
+      error: 'خطا در دریافت شناورها از سرور',
+      details: error.message
+    });
+  }
+});
+
 // 📊 **آمار و گزارش‌ها**
 
 // 1. آمار کلی مالک
