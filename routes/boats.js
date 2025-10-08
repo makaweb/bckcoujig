@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Boat from '../models/Boat.js';
 import FishingMethod from '../models/FishingMethod.js';
 import BoatType from '../models/BoatType.js';
@@ -6,6 +7,15 @@ import FishingTool from '../models/FishingTool.js';
 import FishingActivity from '../models/FishingActivity.js';
 
 const router = express.Router();
+
+// Helper function: تبدیل string به ObjectId (اگر معتبر باشد)
+const toObjectId = (value) => {
+  if (!value) return null;
+  if (mongoose.Types.ObjectId.isValid(value)) {
+    return new mongoose.Types.ObjectId(value);
+  }
+  return null; // اگر معتبر نبود، null برمی‌گردانیم
+};
 
 // 🚤 **مدیریت شناورها**
 
@@ -357,23 +367,32 @@ router.post('/sync', async (req, res) => {
           console.log(`   - boat_type_id: ${newBoatData.boat_type_id}`);
           console.log(`   - fishing_method_id: ${newBoatData.fishing_method_id}`);
 
+          // تبدیل string IDs به ObjectId
+          const cleanedData = {
+            ...newBoatData,
+            boat_type_id: toObjectId(newBoatData.boat_type_id),
+            fishing_method_id: toObjectId(newBoatData.fishing_method_id),
+            owner_id: toObjectId(newBoatData.owner_id),
+            captain_id: toObjectId(newBoatData.captain_id),
+          };
+
           // چون ممکن است شناور در سرور وجود داشته باشد (مثلا توسط کاربر دیگری ثبت شده)
           // ابتدا بر اساس کلیدهای اصلی (boat_code, fishing_method_id) چک می‌کنیم
           let boat = await Boat.findOne({
-            boat_code: newBoatData.boat_code,
-            fishing_method_id: newBoatData.fishing_method_id,
+            boat_code: cleanedData.boat_code,
+            fishing_method_id: cleanedData.fishing_method_id,
           });
 
           if (boat) {
             // اگر وجود داشت، آن را آپدیت می‌کنیم (last write wins)
             console.log(`🔄 شناور موجود است، بروزرسانی می‌شود...`);
-            Object.assign(boat, newBoatData, { synced: 1 });
+            Object.assign(boat, cleanedData, { synced: 1 });
             await boat.save();
             results.updated.push({ localId, serverId: boat._id.toString(), status: 'merged' });
           } else {
             // اگر وجود نداشت، شناور جدید را می‌سازیم
             console.log(`➕ ایجاد شناور جدید...`);
-            boat = new Boat({ ...newBoatData, synced: 1 });
+            boat = new Boat({ ...cleanedData, synced: 1 });
             await boat.save();
             results.created.push({ localId, serverId: boat._id.toString() });
             console.log(`✅ شناور با موفقیت ایجاد شد. Server ID: ${boat._id}`);
@@ -392,22 +411,31 @@ router.post('/sync', async (req, res) => {
         try {
           console.log(`🔄 بروزرسانی شناور: ${updateData.boat_name} (Local ID: ${localId})`);
 
+          // تبدیل string IDs به ObjectId
+          const cleanedData = {
+            ...updateData,
+            boat_type_id: toObjectId(updateData.boat_type_id),
+            fishing_method_id: toObjectId(updateData.fishing_method_id),
+            owner_id: toObjectId(updateData.owner_id),
+            captain_id: toObjectId(updateData.captain_id),
+          };
+
           // اگر server_id وجود نداشت، از boat_code و fishing_method_id استفاده می‌کنیم
           let boat;
-          if (updateData.server_id) {
+          if (cleanedData.server_id) {
             boat = await Boat.findByIdAndUpdate(
-              updateData.server_id,
-              { $set: { ...updateData, synced: 1 } },
+              cleanedData.server_id,
+              { $set: { ...cleanedData, synced: 1 } },
               { new: true, runValidators: true }
             );
           } else {
             // جستجو بر اساس boat_code و fishing_method_id
             boat = await Boat.findOneAndUpdate(
               {
-                boat_code: updateData.boat_code,
-                fishing_method_id: updateData.fishing_method_id
+                boat_code: cleanedData.boat_code,
+                fishing_method_id: cleanedData.fishing_method_id
               },
-              { $set: { ...updateData, synced: 1 } },
+              { $set: { ...cleanedData, synced: 1 } },
               { new: true, runValidators: true }
             );
           }
