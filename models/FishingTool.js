@@ -19,32 +19,7 @@ const fishingToolSchema = new mongoose.Schema({
   // دسته‌بندی ابزار
   category: {
     type: String,
-    enum: ["net", "hook", "trap", "electronic", "mechanical", "other"],
-    default: "other",
-    required: false
-  },
-  // روش‌های صید سازگار (اختیاری)
-  compatible_methods: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "FishingMethod"
-  }],
-  // مشخصات فنی (اختیاری)
-  specifications: {
-    size: String,
-    material: String,
-    weight: String,
-    capacity: String,
-    other: String
-  },
-  // نیاز به نگهداری (اختیاری)
-  maintenance_required: {
-    type: Boolean,
-    default: false
-  },
-  // فاصله زمانی نگهداری به روز (اختیاری)
-  maintenance_interval_days: {
-    type: Number,
-    default: null
+    default: null  
   },
   // آیا پیش‌فرض است؟ (مطابق با is_default در دیتابیس محلی)
   is_default: {
@@ -57,29 +32,11 @@ const fishingToolSchema = new mongoose.Schema({
     ref: "User",
     default: null
   },
-  // ابزار والد (مطابق با parent_tool_id در دیتابیس محلی)
-  parent_tool_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "FishingTool",
-    default: null
-  },
-  // روش صید مرتبط (مطابق با method_id در دیتابیس محلی)
-  method_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "FishingMethod",
-    default: null
-  },
   // وضعیت فعال بودن
   is_active: {
     type: Boolean,
     default: true
   },
-  // وضعیت تأیید (مطابق با approval_status در دیتابیس محلی)
-  approval_status: {
-    type: String,
-    enum: ["pending", "approved", "rejected"],
-    default: "approved"
-  }
 }, { timestamps: true });
 
 // ایندکس‌ها
