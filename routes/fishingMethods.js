@@ -1,7 +1,17 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import FishingMethod from '../models/FishingMethod.js';
 
 const router = express.Router();
+
+// Helper function: تبدیل string به ObjectId (اگر معتبر باشد)
+const toObjectId = (value) => {
+  if (!value) return null;
+  if (mongoose.Types.ObjectId.isValid(value)) {
+    return new mongoose.Types.ObjectId(value);
+  }
+  return null; // اگر معتبر نبود، null برمی‌گردانیم
+};
 
 // 🎣 **مدیریت روش‌های صید**
 
@@ -195,22 +205,29 @@ router.post('/sync', async (req, res) => {
         try {
           console.log(`📝 پردازش روش صید جدید: ${newMethodData.name} (Local ID: ${localId})`);
 
+          // تبدیل string IDs به ObjectId
+          const cleanedData = {
+            ...newMethodData,
+            creator_id: toObjectId(newMethodData.creator_id),
+            parent_method_id: toObjectId(newMethodData.parent_method_id),
+          };
+
           // بررسی وجود روش صید با همین نام
           let method = await FishingMethod.findOne({
-            name: newMethodData.name,
+            name: cleanedData.name,
           });
 
           if (method) {
             // اگر وجود داشت، آن را آپدیت می‌کنیم (merge)
             console.log(`🔄 روش صید موجود است، بروزرسانی می‌شود...`);
-            Object.assign(method, newMethodData);
+            Object.assign(method, cleanedData);
             await method.save();
             results.updated.push({ localId, serverId: method._id.toString(), status: 'merged' });
             console.log(`✅ روش صید با موفقیت merge شد. Server ID: ${method._id}`);
           } else {
             // اگر وجود نداشت، روش صید جدید را می‌سازیم
             console.log(`➕ ایجاد روش صید جدید...`);
-            method = new FishingMethod(newMethodData);
+            method = new FishingMethod(cleanedData);
             await method.save();
             results.created.push({ localId, serverId: method._id.toString() });
             console.log(`✅ روش صید با موفقیت ایجاد شد. Server ID: ${method._id}`);
@@ -231,18 +248,25 @@ router.post('/sync', async (req, res) => {
         try {
           console.log(`🔄 بروزرسانی روش صید: ${updateData.name} (Local ID: ${localId})`);
 
+          // تبدیل string IDs به ObjectId
+          const cleanedData = {
+            ...updateData,
+            creator_id: toObjectId(updateData.creator_id),
+            parent_method_id: toObjectId(updateData.parent_method_id),
+          };
+
           let method;
           if (server_id) {
             method = await FishingMethod.findByIdAndUpdate(
               server_id,
-              { $set: updateData },
+              { $set: cleanedData },
               { new: true, runValidators: true }
             );
           } else {
             // جستجو بر اساس نام
             method = await FishingMethod.findOneAndUpdate(
-              { name: updateData.name },
-              { $set: updateData },
+              { name: cleanedData.name },
+              { $set: cleanedData },
               { new: true, runValidators: true }
             );
           }
