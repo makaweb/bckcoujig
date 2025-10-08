@@ -8,16 +8,19 @@ const boatSchema = new mongoose.Schema({
   fuel_quota: { type: String, default: null },
   boat_type_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "BoatType"
+    ref: "BoatType",
+    default: null
   },
   fishing_method_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "FishingMethod"
+    ref: "FishingMethod",
+    default: null
   },
   status: { type: Number, default: 0 }, // 0: pending, 1: active, 2: inactive, etc.
   owner_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User"
+    ref: "User",
+    default: null
   },
   captain_id: {
     type: mongoose.Schema.Types.ObjectId,
