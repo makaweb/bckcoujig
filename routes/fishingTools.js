@@ -1,7 +1,17 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import FishingTool from '../models/FishingTool.js';
 
 const router = express.Router();
+
+// Helper function: تبدیل string به ObjectId (اگر معتبر باشد)
+const toObjectId = (value) => {
+  if (!value) return null;
+  if (mongoose.Types.ObjectId.isValid(value)) {
+    return new mongoose.Types.ObjectId(value);
+  }
+  return null; // اگر معتبر نبود، null برمی‌گردانیم
+};
 
 // 🔧 **مدیریت ابزارهای صید**
 
@@ -205,22 +215,33 @@ router.post('/sync', async (req, res) => {
         try {
           console.log(`📝 پردازش ابزار صید جدید: ${newToolData.name} (Local ID: ${localId})`);
 
+          // تبدیل string IDs به ObjectId
+          const cleanedData = {
+            ...newToolData,
+            creator_id: toObjectId(newToolData.creator_id),
+            parent_tool_id: toObjectId(newToolData.parent_tool_id),
+            method_id: toObjectId(newToolData.method_id),
+            compatible_methods: Array.isArray(newToolData.compatible_methods) 
+              ? newToolData.compatible_methods.map(id => toObjectId(id)).filter(id => id !== null)
+              : []
+          };
+
           // بررسی وجود ابزار صید با همین نام
           let tool = await FishingTool.findOne({
-            name: newToolData.name,
+            name: cleanedData.name,
           });
 
           if (tool) {
             // اگر وجود داشت، آن را آپدیت می‌کنیم (merge)
             console.log(`🔄 ابزار صید موجود است، بروزرسانی می‌شود...`);
-            Object.assign(tool, newToolData);
+            Object.assign(tool, cleanedData);
             await tool.save();
             results.updated.push({ localId, serverId: tool._id.toString(), status: 'merged' });
             console.log(`✅ ابزار صید با موفقیت merge شد. Server ID: ${tool._id}`);
           } else {
             // اگر وجود نداشت، ابزار صید جدید را می‌سازیم
             console.log(`➕ ایجاد ابزار صید جدید...`);
-            tool = new FishingTool(newToolData);
+            tool = new FishingTool(cleanedData);
             await tool.save();
             results.created.push({ localId, serverId: tool._id.toString() });
             console.log(`✅ ابزار صید با موفقیت ایجاد شد. Server ID: ${tool._id}`);
@@ -241,18 +262,29 @@ router.post('/sync', async (req, res) => {
         try {
           console.log(`🔄 بروزرسانی ابزار صید: ${updateData.name} (Local ID: ${localId})`);
 
+          // تبدیل string IDs به ObjectId
+          const cleanedData = {
+            ...updateData,
+            creator_id: toObjectId(updateData.creator_id),
+            parent_tool_id: toObjectId(updateData.parent_tool_id),
+            method_id: toObjectId(updateData.method_id),
+            compatible_methods: Array.isArray(updateData.compatible_methods) 
+              ? updateData.compatible_methods.map(id => toObjectId(id)).filter(id => id !== null)
+              : []
+          };
+
           let tool;
           if (server_id) {
             tool = await FishingTool.findByIdAndUpdate(
               server_id,
-              { $set: updateData },
+              { $set: cleanedData },
               { new: true, runValidators: true }
             );
           } else {
             // جستجو بر اساس نام
             tool = await FishingTool.findOneAndUpdate(
-              { name: updateData.name },
-              { $set: updateData },
+              { name: cleanedData.name },
+              { $set: cleanedData },
               { new: true, runValidators: true }
             );
           }
