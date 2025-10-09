@@ -1,7 +1,9 @@
 // backend/routes/boatTypes.js
+
 import express from 'express';
 import mongoose from 'mongoose';
-import router from 'express';
+
+const router = express.Router();
 
 // تعریف Schema برای BoatType
 const boatTypeSchema = new mongoose.Schema({
@@ -15,7 +17,8 @@ const boatTypeSchema = new mongoose.Schema({
   updated_at: { type: Date, default: Date.now },
 });
 
-const BoatType = mongoose.model('BoatType', boatTypeSchema);
+// بررسی اینکه آیا مدل قبلاً تعریف شده یا نه
+const BoatType = mongoose.models.BoatType || mongoose.model('BoatType', boatTypeSchema);
 
 // انواع شناور پیش‌فرض
 const defaultBoatTypes = [
