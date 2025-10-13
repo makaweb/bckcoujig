@@ -60,6 +60,7 @@ import crewRoutes from './routes/crew.js';
 import fishingMethodRoutes from './routes/fishingMethods.js';
 import fishingToolRoutes from './routes/fishingTools.js';
 import boatTypeRoutes from './routes/boatTypes.js';
+import sailorRoutes from './routes/sailor.js';
 
 app.use('/api/vessels', vesselRoutes);
 app.use('/api/auth', authRoutes);
@@ -68,6 +69,7 @@ app.use('/api/crew', crewRoutes);
 app.use('/api/fishing-methods', fishingMethodRoutes);
 app.use('/api/fishing-tools', fishingToolRoutes);
 app.use('/api/boats/boat-types', boatTypeRoutes);
+app.use('/api/sailor', sailorRoutes);
 
 // Simple ping endpoint for emulator connectivity checks
 app.get('/ping', (req, res) => {
