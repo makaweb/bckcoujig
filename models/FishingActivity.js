@@ -107,7 +107,38 @@ const fishingActivitySchema = new mongoose.Schema({
   last_updated_by: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: "User" 
-  }
+  },
+  
+  // فیلدهای اضافی برای سازگاری با نسخه ملوان
+  crew: [{
+    nationalCode: String,
+    name: String,
+    role: String,
+    share: Number,
+    income: Number
+  }],
+  total_income: { type: Number, default: 0 },
+  total_expense: { type: Number, default: 0 },
+  settlement_status: { 
+    type: String, 
+    enum: ['pending', 'partial', 'completed'], 
+    default: 'pending' 
+  },
+  
+  // اعتراضات ملوانان
+  disputes: [{
+    sailorNationalCode: String,
+    reason: String,
+    description: String,
+    status: { 
+      type: String, 
+      enum: ['pending', 'reviewing', 'resolved', 'rejected'], 
+      default: 'pending' 
+    },
+    createdAt: { type: Date, default: Date.now },
+    resolvedAt: Date,
+    resolution: String
+  }]
 }, { timestamps: true });
 
 // ایندکس‌ها
@@ -115,6 +146,7 @@ fishingActivitySchema.index({ boat_id: 1, start_date: -1 });
 fishingActivitySchema.index({ fishing_method_id: 1 });
 fishingActivitySchema.index({ status: 1 });
 fishingActivitySchema.index({ "crew_members.user_id": 1 });
+fishingActivitySchema.index({ "crew.nationalCode": 1 }); // برای نسخه ملوان
 
 const FishingActivity = mongoose.model("FishingActivity", fishingActivitySchema);
 export default FishingActivity;
