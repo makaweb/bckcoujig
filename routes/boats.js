@@ -19,30 +19,7 @@ const toObjectId = (value) => {
 
 // 🚤 **مدیریت شناورها**
 
-// 1. دریافت تمام شناورهای مالک
-router.get('/:ownerId', async (req, res) => {
-  try {
-    const { ownerId } = req.params;
-    const boats = await Boat.find({ owner_id: ownerId })
-      .populate('boat_type_id')
-      .populate('fishing_method_id')
-      .populate('captain_id', 'name phone')
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      boats,
-      total: boats.length
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// 2. ثبت شناور جدید
+// ثبت شناور جدید
 router.post('/', async (req, res) => {
   try {
     const {
@@ -1009,6 +986,29 @@ router.get('/stats/:ownerId', async (req, res) => {
         by_fishing_method: stats[2],
         total_activities: stats[3]
       }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// دریافت تمام شناورهای مالک (باید در آخر باشد چون catch-all است)
+router.get('/:ownerId', async (req, res) => {
+  try {
+    const { ownerId } = req.params;
+    const boats = await Boat.find({ owner_id: ownerId })
+      .populate('boat_type_id')
+      .populate('fishing_method_id')
+      .populate('captain_id', 'name phone')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      boats,
+      total: boats.length
     });
   } catch (error) {
     res.status(500).json({
