@@ -7,24 +7,20 @@ const boatSchema = new mongoose.Schema({
   documents: { type: String, default: null },
   fuel_quota: { type: String, default: null },
   boat_type_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "BoatType",
+    type: mongoose.Schema.Types.Mixed, // Can be ObjectId or String
     default: null
   },
   fishing_method_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "FishingMethod",
+    type: mongoose.Schema.Types.Mixed, // Can be ObjectId or String
     default: null
   },
   status: { type: Number, default: 0 }, // 0: pending, 1: active, 2: inactive, etc.
   owner_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    type: String, // National code
     default: null
   },
   captain_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    type: String, // National code
     default: null
   },
   installed_tools: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
