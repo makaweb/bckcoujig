@@ -1,7 +1,7 @@
-import express, { Router } from 'express';
+import express from 'express';
 import Vessel from '../models/Vessel.js';
 
-const router = Router();
+const router = express.Router();
 
 // دریافت شناورهای نزدیک
 // query: lat, lon, radiusKm
