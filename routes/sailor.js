@@ -164,11 +164,19 @@ router.post('/auth/verify-code', async (req, res) => {
       });
     }
 
-    // به‌روزرسانی آخرین ورود
+    // به‌روزرسانی آخرین ورود و تایید کاربر (چون با OTP وارد شده)
     await User.updateOne(
       { _id: sailor._id },
-      { $set: { lastLoginAt: new Date() } }
+      { 
+        $set: { 
+          lastLoginAt: new Date(),
+          isVerified: true 
+        } 
+      }
     );
+    
+    // به‌روزرسانی sailor object برای response
+    sailor.isVerified = true;
 
     res.json({
       success: true,
