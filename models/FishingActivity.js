@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import moment from "moment-jalaali";
 
 const fishingActivitySchema = new mongoose.Schema({
   boat_id: { 
@@ -10,79 +9,41 @@ const fishingActivitySchema = new mongoose.Schema({
   fishing_method_id: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: "FishingMethod", 
-    required: true 
+    default: null
   },
   
   // تاریخ‌ها و زمان‌بندی
   start_date: { type: String, required: true }, // تاریخ شروع فعالیت
   end_date: { type: String, default: null }, // تاریخ پایان (اختیاری)
-  estimated_duration_days: { type: Number, default: null },
   
   // منطقه صید
-  fishing_area: {
-    name: String,
-    coordinates: {
-      latitude: Number,
-      longitude: Number
-    },
-    depth_range: {
-      min: Number,
-      max: Number
-    }
+  fishing_area: { type: String, default: null },
+  
+  // خدمه - ذخیره به صورت JSON string
+  crew_details: { type: String, default: null }, // JSON stringified array
+  
+  // ابزارهای مورد استفاده - ذخیره به صورت JSON string
+  tool_details: { type: String, default: null }, // JSON stringified array
+  
+  // نتایج صید - ذخیره به صورت JSON string
+  catch_results: { type: String, default: null }, // JSON stringified array
+  
+  // هزینه‌ها - ذخیره به صورت JSON string
+  expenses: { type: String, default: null }, // JSON stringified object
+  
+  // درآمد مالک
+  owner_income: { type: Number, default: 0 },
+  
+  // یادداشت‌ها و گزارش
+  notes: { type: String, default: null },
+  
+  // متادیتا
+  created_by: { 
+    type: String, // National code
+    required: true 
   },
-  
-  // خدمه
-  crew_members: [{
-    user_id: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: "User" 
-    },
-    role: {
-      type: String,
-      enum: ["captain", "first_mate", "fisherman", "engineer", "cook", "other"]
-    },
-    join_date: String,
-    leave_date: String,
-    daily_wage: Number
-  }],
-  
-  // ابزارهای مورد استفاده
-  tools_used: [{
-    tool_id: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: "FishingTool" 
-    },
-    quantity: Number,
-    condition_before: String,
-    condition_after: String,
-    maintenance_needed: Boolean
-  }],
-  
-  // نتایج صید
-  catch_results: [{
-    fish_type: String,
-    quantity: Number,
-    unit: { type: String, enum: ["kg", "piece", "box"], default: "kg" },
-    quality_grade: { type: String, enum: ["A", "B", "C"], default: "A" },
-    market_price: Number
-  }],
-  
-  // هزینه‌ها
-  expenses: {
-    fuel_cost: Number,
-    crew_wages: Number,
-    tool_maintenance: Number,
-    food_supplies: Number,
-    other_costs: Number,
-    total_cost: Number
-  },
-  
-  // درآمد
-  revenue: {
-    total_sale: Number,
-    sale_date: String,
-    buyer_info: String,
-    profit_margin: Number
+  last_updated_by: { 
+    type: String // National code
   },
   
   // وضعیت
@@ -92,61 +53,14 @@ const fishingActivitySchema = new mongoose.Schema({
     default: "planned"
   },
   
-  // یادداشت‌ها و گزارش
-  notes: String,
-  weather_conditions: String,
-  challenges_faced: [String],
-  lessons_learned: String,
-  
-  // متادیتا
-  created_by: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User", 
-    required: true 
-  },
-  last_updated_by: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User" 
-  },
-  
-  // فیلدهای اضافی برای سازگاری با نسخه ملوان
-  crew: [{
-    nationalCode: String,
-    name: String,
-    role: String,
-    share: Number,
-    income: Number
-  }],
-  total_income: { type: Number, default: 0 },
-  total_expense: { type: Number, default: 0 },
-  settlement_status: { 
-    type: String, 
-    enum: ['pending', 'partial', 'completed'], 
-    default: 'pending' 
-  },
-  
-  // اعتراضات ملوانان
-  disputes: [{
-    sailorNationalCode: String,
-    reason: String,
-    description: String,
-    status: { 
-      type: String, 
-      enum: ['pending', 'reviewing', 'resolved', 'rejected'], 
-      default: 'pending' 
-    },
-    createdAt: { type: Date, default: Date.now },
-    resolvedAt: Date,
-    resolution: String
-  }]
+  synced: { type: Number, default: 0 }
 }, { timestamps: true });
 
 // ایندکس‌ها
 fishingActivitySchema.index({ boat_id: 1, start_date: -1 });
 fishingActivitySchema.index({ fishing_method_id: 1 });
 fishingActivitySchema.index({ status: 1 });
-fishingActivitySchema.index({ "crew_members.user_id": 1 });
-fishingActivitySchema.index({ "crew.nationalCode": 1 }); // برای نسخه ملوان
+fishingActivitySchema.index({ created_by: 1 });
 
 const FishingActivity = mongoose.model("FishingActivity", fishingActivitySchema);
 export default FishingActivity;
