@@ -50,11 +50,11 @@ router.post('/auth/send-code', async (req, res) => {
     
     // ذخیره کد در دیتابیس
     await Verification.findOneAndUpdate(
-      { mobile: m, type: 'sailor_login' },
+      { mobile: m, type: 'login' },
       {
         mobile: m,
         code,
-        type: 'sailor_login',
+        type: 'login',
         expiresAt: expiresAt,
         attempts: 0,
         isUsed: false
@@ -116,7 +116,7 @@ router.post('/auth/verify-code', async (req, res) => {
     // پیدا کردن کد
     const verification = await Verification.findOne({
       mobile,
-      type: 'sailor_login',
+      type: 'login',
       isUsed: false,
       expiresAt: { $gt: new Date() }
     });
