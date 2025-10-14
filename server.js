@@ -61,6 +61,9 @@ import fishingMethodRoutes from './routes/fishingMethods.js';
 import fishingToolRoutes from './routes/fishingTools.js';
 import boatTypeRoutes from './routes/boatTypes.js';
 import sailorRoutes from './routes/sailor.js';
+import crewMemberRoutes from './routes/crewMembers.js';
+import settlementRoutes from './routes/settlements.js';
+import fishingActivityRoutes from './routes/fishingActivities.js';
 
 app.use('/api/vessels', vesselRoutes);
 app.use('/api/auth', authRoutes);
@@ -70,6 +73,9 @@ app.use('/api/fishing-methods', fishingMethodRoutes);
 app.use('/api/fishing-tools', fishingToolRoutes);
 app.use('/api/boats/boat-types', boatTypeRoutes);
 app.use('/api/sailor', sailorRoutes);
+app.use('/api/crew-members', crewMemberRoutes);
+app.use('/api/settlements', settlementRoutes);
+app.use('/api/fishing-activities', fishingActivityRoutes);
 
 // Simple ping endpoint for emulator connectivity checks
 app.get('/ping', (req, res) => {
