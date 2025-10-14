@@ -20,7 +20,7 @@ const toObjectId = (value) => {
 // 🚤 **مدیریت شناورها**
 
 // 1. دریافت تمام شناورهای مالک
-router.get('/boats/:ownerId', async (req, res) => {
+router.get('/:ownerId', async (req, res) => {
   try {
     const { ownerId } = req.params;
     const boats = await Boat.find({ owner_id: ownerId })
@@ -43,7 +43,7 @@ router.get('/boats/:ownerId', async (req, res) => {
 });
 
 // 2. ثبت شناور جدید
-router.post('/boats', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const {
       boat_name,
@@ -108,7 +108,7 @@ router.post('/boats', async (req, res) => {
 });
 
 // 3. بررسی امکان ثبت شناور (قبل از ثبت)
-router.post('/boats/check-availability', async (req, res) => {
+router.post('/check-availability', async (req, res) => {
   try {
     const { boat_code, fishing_method_id } = req.body;
 
@@ -144,7 +144,7 @@ router.post('/boats/check-availability', async (req, res) => {
 });
 
 // 3.5. بررسی شناور موجود و پیشنهاد گزینه‌ها
-router.post('/boats/check-existing', async (req, res) => {
+router.post('/check-existing', async (req, res) => {
   try {
     const { boat_code, fishing_method_id, owner_id } = req.body;
 
@@ -252,7 +252,7 @@ router.post('/boats/check-existing', async (req, res) => {
 });
 
 // 3.6. افزودن روش صید جدید به شناور موجود
-router.post('/boats/add-fishing-method', async (req, res) => {
+router.post('/add-fishing-method', async (req, res) => {
   try {
     const {
       base_boat_id,
@@ -481,7 +481,7 @@ router.post('/sync', async (req, res) => {
 });
 
 // 4. به‌روزرسانی شناور
-router.put('/boats/:boatId', async (req, res) => {
+router.put('/:boatId', async (req, res) => {
   try {
     const { boatId } = req.params;
     const updateData = req.body;
@@ -515,7 +515,7 @@ router.put('/boats/:boatId', async (req, res) => {
 });
 
 // 5. حذف شناور
-router.delete('/boats/:boatId', async (req, res) => {
+router.delete('/:boatId', async (req, res) => {
   try {
     const { boatId } = req.params;
 
@@ -924,7 +924,7 @@ router.post('/boat-types/sync', async (req, res) => {
 // 📥 **وارد کردن و خروجی گرفتن شناورها**
 
 // دریافت شناورهای کاربر برای وارد کردن (بر اساس کد ملی)
-router.post('/boats/get-user-boats', async (req, res) => {
+router.post('/get-user-boats', async (req, res) => {
   try {
     const { nationalCode } = req.body;
 
