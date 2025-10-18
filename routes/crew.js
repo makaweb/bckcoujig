@@ -166,7 +166,9 @@ router.get('/sailors/:nationalCode/current-boat', async (req, res) => {
     // 1. دریافت نام کامل مالک
     let ownerName = boat.owner_id || null;
     if (boat.owner_id) {
-      const owner = await User.findOne({ national_code: boat.owner_id }).lean();
+      console.log('🔍 Looking for owner with nationalCode:', boat.owner_id);
+      const owner = await User.findOne({ nationalCode: boat.owner_id }).lean();
+      console.log('👤 Owner found:', owner);
       if (owner) {
         ownerName = owner.name;
       }
@@ -175,7 +177,9 @@ router.get('/sailors/:nationalCode/current-boat', async (req, res) => {
     // 2. دریافت نام کامل ناخدا (اگر وجود دارد)
     let captainName = boat.captain_id || null;
     if (boat.captain_id) {
-      const captain = await User.findOne({ national_code: boat.captain_id }).lean();
+      console.log('🔍 Looking for captain with nationalCode:', boat.captain_id);
+      const captain = await User.findOne({ nationalCode: boat.captain_id }).lean();
+      console.log('👤 Captain found:', captain);
       if (captain) {
         captainName = captain.name;
       }
@@ -226,7 +230,7 @@ router.get('/sailors/:nationalCode/current-boat', async (req, res) => {
       
       // اگر نام نداشت، از جدول users بگیر
       if (!crew.name || crew.name === crew.national_code) {
-        const user = await User.findOne({ national_code: crew.national_code }).lean();
+        const user = await User.findOne({ nationalCode: crew.national_code }).lean();
         if (user) {
           crewName = user.name;
         }
