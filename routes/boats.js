@@ -914,32 +914,64 @@ router.post('/get-user-boats', async (req, res) => {
 
     console.log(`🔍 [BoatImport] درخواست شناورهای کاربر با کد ملی: ${nationalCode}`);
 
-    // جستجوی شناورهای کاربر
+    // جستجوی شناورهای کاربر (بدون populate برای جلوگیری از خطای ObjectId)
     const boats = await Boat.find({ owner_id: nationalCode })
-      .populate('boat_type_id', 'name')
-      .populate('fishing_method_id', 'name name_fa')
       .sort({ createdAt: -1 })
       .lean();
 
     console.log(`✅ [BoatImport] ${boats.length} شناور یافت شد`);
 
-    // تبدیل به فرمت مناسب برای انتقال
-    const formattedBoats = boats.map(boat => ({
-      id: boat._id.toString(),
-      name: boat.boat_name,
-      code: boat.boat_code,
-      type: boat.boat_type_id?.name || 'نامشخص',
-      fishingMethod: boat.fishing_method_id?.name_fa || boat.fishing_method_id?.name || 'نامشخص',
-      status: boat.status || 0,
-      registrationDate: boat.registration_date || boat.createdAt,
-      tools: boat.installed_tools || '',
-      fuelQuota: boat.fuel_quota || 0,
-      length: boat.length,
-      width: boat.width,
-      enginePower: boat.engine_power,
-      hullMaterial: boat.hull_material,
-      manufacturerYear: boat.manufacturer_year,
-    }));
+    // populate دستی برای جلوگیری از خطا با ObjectId های نامعتبر
+    const formattedBoats = [];
+    
+    for (const boat of boats) {
+      try {
+        let boatTypeName = 'نامشخص';
+        let fishingMethodName = 'نامشخص';
+
+        // تلاش برای دریافت نام نوع شناور
+        if (boat.boat_type_id && mongoose.Types.ObjectId.isValid(boat.boat_type_id)) {
+          const boatType = await BoatType.findById(boat.boat_type_id).select('name name_fa').lean();
+          if (boatType) {
+            boatTypeName = boatType.name_fa || boatType.name || 'نامشخص';
+          }
+        } else if (boat.boat_type) {
+          // اگر مستقیماً نام نوع شناور ذخیره شده باشد
+          boatTypeName = boat.boat_type;
+        }
+
+        // تلاش برای دریافت نام روش صید
+        if (boat.fishing_method_id && mongoose.Types.ObjectId.isValid(boat.fishing_method_id)) {
+          const fishingMethod = await FishingMethod.findById(boat.fishing_method_id).select('name name_fa').lean();
+          if (fishingMethod) {
+            fishingMethodName = fishingMethod.name_fa || fishingMethod.name || 'نامشخص';
+          }
+        } else if (boat.fishing_type) {
+          // اگر مستقیماً نام روش صید ذخیره شده باشد
+          fishingMethodName = boat.fishing_type;
+        }
+
+        formattedBoats.push({
+          id: boat._id.toString(),
+          name: boat.boat_name,
+          code: boat.boat_code,
+          type: boatTypeName,
+          fishingMethod: fishingMethodName,
+          status: boat.status || 0,
+          registrationDate: boat.registration_date || boat.createdAt,
+          tools: boat.installed_tools || '',
+          fuelQuota: boat.fuel_quota || 0,
+          length: boat.length,
+          width: boat.width,
+          enginePower: boat.engine_power,
+          hullMaterial: boat.hull_material,
+          manufacturerYear: boat.manufacturer_year,
+        });
+      } catch (boatError) {
+        console.error(`⚠️ [BoatImport] خطا در پردازش شناور ${boat.boat_code}:`, boatError.message);
+        // ادامه به شناورهای بعدی حتی اگر یکی خطا داشت
+      }
+    }
 
     res.json({
       success: true,
