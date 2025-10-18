@@ -147,8 +147,13 @@ router.get('/sailors/:nationalCode/current-boat', async (req, res) => {
       });
     }
 
-    // دریافت اطلاعات شناور
+    // دریافت اطلاعات کامل شناور
     const Boat = (await import('../models/Boat.js')).default;
+    const User = (await import('../models/User.js')).default;
+    const BoatType = (await import('../models/BoatType.js')).default;
+    const FishingMethod = (await import('../models/FishingMethod.js')).default;
+    const FishingTool = (await import('../models/FishingTool.js')).default;
+
     const boat = await Boat.findById(crewMember.boat_id).lean();
 
     if (!boat) {
@@ -158,25 +163,87 @@ router.get('/sailors/:nationalCode/current-boat', async (req, res) => {
       });
     }
 
-    // پردازش و بهینه‌سازی داده‌ها برای پنل ملوان
-    const BoatType = (await import('../models/BoatType.js')).default;
-    const FishingMethod = (await import('../models/FishingMethod.js')).default;
+    // 1. دریافت نام کامل مالک
+    let ownerName = boat.owner_id || null;
+    if (boat.owner_id) {
+      const owner = await User.findOne({ national_code: boat.owner_id }).lean();
+      if (owner) {
+        ownerName = owner.name;
+      }
+    }
 
-    // دریافت عنوان نوع شناور (اگر ID داشت)
-    let boatTypeName = null;
+    // 2. دریافت نام کامل ناخدا (اگر وجود دارد)
+    let captainName = boat.captain_id || null;
+    if (boat.captain_id) {
+      const captain = await User.findOne({ national_code: boat.captain_id }).lean();
+      if (captain) {
+        captainName = captain.name;
+      }
+    }
+
+    // 3. دریافت نوع شناور
+    let boatTypeName = boat.boat_type || null;
     if (boat.boat_type_id) {
       const boatType = await BoatType.findById(boat.boat_type_id).lean();
-      boatTypeName = boatType ? boatType.name : null;
+      if (boatType) {
+        boatTypeName = boatType.name_fa || boatType.name;
+      }
     }
 
-    // دریافت عنوان روش صید (اگر ID داشت)
-    let fishingMethodName = null;
+    // 4. دریافت روش صید
+    let fishingMethodName = boat.fishing_type || null;
     if (boat.fishing_method_id) {
       const fishingMethod = await FishingMethod.findById(boat.fishing_method_id).lean();
-      fishingMethodName = fishingMethod ? fishingMethod.name : null;
+      if (fishingMethod) {
+        fishingMethodName = fishingMethod.name_fa || fishingMethod.name;
+      }
     }
 
-    // ساختار داده بهینه‌شده برای ملوان (بدون ID های غیرضروری)
+    // 5. تعداد خدمه فعال
+    const crewCount = await CrewMember.countDocuments({
+      boat_id: boat._id,
+      is_active: 1
+    });
+
+    // 6. دریافت اسامی ابزار صید (اگر وجود دارد)
+    let installedToolsNames = [];
+    if (boat.installed_tools && Array.isArray(boat.installed_tools) && boat.installed_tools.length > 0) {
+      const tools = await FishingTool.find({
+        _id: { $in: boat.installed_tools }
+      }).lean();
+      
+      installedToolsNames = tools.map(tool => tool.name_fa || tool.name);
+    }
+
+    // 7. دریافت لیست کامل خدمه
+    const allCrew = await CrewMember.find({
+      boat_id: boat._id,
+      is_active: 1
+    }).lean();
+
+    const crewList = await Promise.all(allCrew.map(async (crew) => {
+      let crewName = crew.name || crew.national_code;
+      
+      // اگر نام نداشت، از جدول users بگیر
+      if (!crew.name || crew.name === crew.national_code) {
+        const user = await User.findOne({ national_code: crew.national_code }).lean();
+        if (user) {
+          crewName = user.name;
+        }
+      }
+
+      return {
+        _id: crew._id,
+        national_code: crew.national_code,
+        name: crewName,
+        role: crew.role,
+        share_percentage: crew.share_percentage,
+        assignment_date: crew.assignment_date,
+        is_active: crew.is_active
+      };
+    }));
+
+    // ساختار داده کامل و بهینه‌شده
     const optimizedBoatData = {
       _id: boat._id,
       boat_name: boat.boat_name,
@@ -184,21 +251,26 @@ router.get('/sailors/:nationalCode/current-boat', async (req, res) => {
       registration_date: boat.registration_date,
       documents: boat.documents,
       fuel_quota: boat.fuel_quota,
-      boat_type: boatTypeName, // عنوان به جای ID
-      fishing_type: fishingMethodName, // عنوان به جای ID
+      boat_type: boatTypeName,
+      fishing_type: fishingMethodName,
+      installed_tools: installedToolsNames, // اسامی ابزار
       status: boat.status,
       owner_id: boat.owner_id,
+      owner_name: ownerName, // نام کامل مالک
       captain_id: boat.captain_id,
+      captain_name: captainName, // نام کامل ناخدا
+      crew_count: crewCount, // تعداد خدمه
       invoice_period: boat.invoice_period,
       settlement_period: boat.settlement_period,
       min_crew: boat.min_crew,
       max_crew: boat.max_crew,
-      synced: 1, // همیشه از سرور دریافت شده
+      crew_list: crewList, // لیست کامل خدمه
+      synced: 1,
       createdAt: boat.createdAt,
       updatedAt: boat.updatedAt,
     };
 
-    // ساختار داده بهینه‌شده برای اطلاعات خدمه
+    // اطلاعات خدمه فعلی ملوان
     const optimizedCrewData = {
       _id: crewMember._id,
       boat_id: crewMember.boat_id,
@@ -211,7 +283,7 @@ router.get('/sailors/:nationalCode/current-boat', async (req, res) => {
       is_active: crewMember.is_active,
       notes: crewMember.notes,
       owner_id: crewMember.owner_id,
-      synced: 0, // برای همگام‌سازی بعدی
+      synced: 0,
       createdAt: crewMember.createdAt,
       updatedAt: crewMember.updatedAt,
     };
