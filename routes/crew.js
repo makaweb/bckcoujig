@@ -1,5 +1,6 @@
 import express from 'express';
 import User from '../models/User.js';
+import CrewMember from '../models/CrewMember.js';
 
 const router = express.Router();
 
@@ -116,6 +117,55 @@ router.post('/sync', async (req, res) => {
     return res.json({ success: true, results, message: 'همگام‌سازی خدمه انجام شد' });
   } catch (error) {
     console.error('POST /crew/sync error:', error);
+    return res.status(500).json({ success: false, error: 'خطای داخلی سرور' });
+  }
+});
+
+// GET /api/crew/sailors/:nationalCode/current-boat
+// دریافت شناور فعال یک ملوان
+router.get('/sailors/:nationalCode/current-boat', async (req, res) => {
+  try {
+    const { nationalCode } = req.params;
+
+    if (!nationalCode || nationalCode.length !== 10) {
+      return res.status(400).json({ success: false, error: 'کد ملی ملوان نامعتبر است' });
+    }
+
+    // پیدا کردن خدمه فعال این ملوان
+    const crewMember = await CrewMember.findOne({
+      national_code: nationalCode,
+      is_active: 1
+    })
+      .sort({ assignment_date: -1 })
+      .lean();
+
+    if (!crewMember) {
+      return res.json({ 
+        success: true, 
+        data: null, 
+        message: 'ملوان در حال حاضر در شناوری فعالیت نمی‌کند' 
+      });
+    }
+
+    // دریافت اطلاعات شناور
+    const Boat = (await import('../models/Boat.js')).default;
+    const boat = await Boat.findById(crewMember.boat_id).lean();
+
+    if (!boat) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'شناور یافت نشد' 
+      });
+    }
+
+    return res.json({ 
+      success: true, 
+      data: boat,
+      crewMember: crewMember,
+      message: 'شناور فعال ملوان با موفقیت دریافت شد'
+    });
+  } catch (error) {
+    console.error('GET /crew/sailors/:nationalCode/current-boat error:', error);
     return res.status(500).json({ success: false, error: 'خطای داخلی سرور' });
   }
 });
